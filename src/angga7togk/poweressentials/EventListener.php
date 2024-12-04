@@ -17,97 +17,89 @@ use pocketmine\network\mcpe\protocol\GameRulesChangedPacket;
 use pocketmine\network\mcpe\protocol\types\BoolGameRule;
 use pocketmine\utils\TextFormat;
 
-class EventListener implements Listener
-{
-	private DataManager $dataManager;
-	public function __construct(private PowerEssentials $plugin)
-	{
-		$this->dataManager = $this->plugin->getDataManager();
-	}
+class EventListener implements Listener {
+    private DataManager $dataManager;
 
-	public function onLogin(PlayerLoginEvent $event): void
-	{
-		$player = $event->getPlayer();
-		$this->plugin->registerUserManager($player);
+    public function __construct(private PowerEssentials $plugin) {
+        $this->dataManager = $this->plugin->getDataManager();
+    }
 
-		// Anti namespace
-		if (!$player->hasPermission("poweressentials.antinamespace.bypass")) {
-			if (PEConfig::isAntiNamespace()) {
-				if (strpos($player->getName(), " ")) {
-					$player->kick(TextFormat::RED . PELang::fromConsole()->translateString('error.namespace'));
-				}
-			}
-		}
-	}
+    public function onLogin(PlayerLoginEvent $event): void {
+        $player = $event->getPlayer();
+        $this->plugin->registerUserManager($player);
 
-	public function onQuit(PlayerQuitEvent $event): void
-	{
-		$this->plugin->unregisterUserManager($event->getPlayer());
-	}
+        // Anti namespace
+        if (!$player->hasPermission("poweressentials.antinamespace.bypass")) {
+            if (PEConfig::isAntiNamespace()) {
+                if (strpos($player->getName(), " ")) {
+                    $player->kick(TextFormat::RED . PELang::fromConsole()->translateString('error.namespace'));
+                }
+            }
+        }
+    }
+
+    public function onQuit(PlayerQuitEvent $event): void {
+        $this->plugin->unregisterUserManager($event->getPlayer());
+    }
 
 
-	public function onJoin(PlayerJoinEvent $event): void
-	{
-		$player = $event->getPlayer();
-		$mgr = $this->plugin->getUserManager($player);
+    public function onJoin(PlayerJoinEvent $event): void {
+        $player = $event->getPlayer();
+        $mgr = $this->plugin->getUserManager($player);
 
-		// Coordinates
-		if ($mgr->getCoordinatesShow()) {
-			$pk = new GameRulesChangedPacket();
-			$pk->gameRules = ["showcoordinates" => new BoolGameRule(true, false)];
-			$event->getPlayer()->getNetworkSession()->sendDataPacket($pk);
-		}
+        // Coordinates
+        if ($mgr->getCoordinatesShow()) {
+            $pk = new GameRulesChangedPacket();
+            $pk->gameRules = ["showcoordinates" => new BoolGameRule(true, false)];
+            $event->getPlayer()->getNetworkSession()->sendDataPacket($pk);
+        }
 
-		// Custom Nickname
-		if (($nick = $mgr->getCustomNick()) != null) {
-			$player->setDisplayName($nick);
-		}
+        // Custom Nickname
+        if (($nick = $mgr->getCustomNick()) != null) {
+            $player->setDisplayName($nick);
+        }
 
-		// Force Gamemode
-		if (PEConfig::isGamemodeJoin()) {
-			if (($gamemode = PEConfig::getGamemodeJoin()) != null) {
-				$player->setGamemode($gamemode);
-			}
-		}
+        // Force Gamemode
+        if (PEConfig::isGamemodeJoin()) {
+            if (($gamemode = PEConfig::getGamemodeJoin()) != null) {
+                $player->setGamemode($gamemode);
+            }
+        }
 
-		// Spawn Lobby 
-		if (PEConfig::isSpawnLobbyJoin()) {
-			if (($posLobby = $this->dataManager->getLobby()) != null) {
-				$player->teleport($posLobby);
-			}
-		}
-	}
+        // Spawn Lobby
+        if (PEConfig::isSpawnLobbyJoin()) {
+            if (($posLobby = $this->dataManager->getLobby()) != null) {
+                $player->teleport($posLobby);
+            }
+        }
+    }
 
-	public function onInteraction(PlayerInteractEvent $event): void
-	{
-		$this->banItemEvent($event);
-	}
+    public function onInteraction(PlayerInteractEvent $event): void {
+        $this->banItemEvent($event);
+    }
 
-	public function onPlace(BlockPlaceEvent $event): void
-	{
-		$this->banItemEvent($event);
-	}
+    private function banItemEvent(Event $event) {
+        if ($event instanceof BlockBreakEvent || $event instanceof BlockPlaceEvent || $event instanceof PlayerInteractEvent) {
+            $player = $event->getPlayer();
+            $itemInHand = $player->getInventory()->getItemInHand();
+            $playerWorld = $player->getWorld();
 
-	public function onBreak(BlockBreakEvent $event)
-	{
-		$this->banItemEvent($event);
-	}
+            // Ban Item
+            if ($this->dataManager->isBannedItem($itemInHand, $playerWorld) && !$player->hasPermission('poweressentials.banitem.bypass')) {
+                $lang = PELang::fromConsole();
+                $prefix = TextFormat::GOLD . $lang->translateString('banitem.prefix') . " ";
 
-	private function banItemEvent(Event $event)
-	{
-		if ($event instanceof BlockBreakEvent || $event instanceof BlockPlaceEvent || $event instanceof PlayerInteractEvent) {
-			$player = $event->getPlayer();
-			$itemInHand = $player->getInventory()->getItemInHand();
-			$playerWorld = $player->getWorld();
+                $player->sendMessage($prefix . $lang->translateString('banitem.error.item.is.banned'));
+                $event->cancel();
+            }
+        }
+    }
 
-			// Ban Item
-			if ($this->dataManager->isBannedItem($itemInHand, $playerWorld) && !$player->hasPermission('poweressentials.banitem.bypass')) {
-				$lang = PELang::fromConsole();
-				$prefix = TextFormat::GOLD . $lang->translateString('banitem.prefix') . " ";
+    public function onPlace(BlockPlaceEvent $event): void {
+        $this->banItemEvent($event);
+    }
 
-				$player->sendMessage($prefix .  $lang->translateString('banitem.error.item.is.banned'));
-				$event->cancel();
-			}
-		}
-	}
+    public function onBreak(BlockBreakEvent $event) {
+        $this->banItemEvent($event);
+    }
 }

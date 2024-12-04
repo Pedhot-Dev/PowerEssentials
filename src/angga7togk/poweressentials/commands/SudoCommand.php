@@ -23,14 +23,14 @@ class SudoCommand extends PECommand {
 
         $targetName = array_shift($args);
         $target = Server::getInstance()->getPlayerExact($targetName);
-        
-        if (!$target instanceof Player) { 
+
+        if (!$target instanceof Player) {
             $sender->sendMessage($prefix . $lang->translateString('error.player.null'));
             return;
         }
 
         $commandOrMessage = implode(" ", $args);
-        $target->chat($commandOrMessage); 
+        $target->chat($commandOrMessage);
 
         $sender->sendMessage($prefix . $lang->translateString('sudo.success', [$target->getName()]));
     }

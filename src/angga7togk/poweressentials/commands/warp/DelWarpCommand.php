@@ -10,33 +10,31 @@ use pocketmine\player\Player;
 
 class DelWarpCommand extends PECommand {
 
-  public function __construct()
-  {
-    parent::__construct('delwarp', 'delete warp from server', '/delwarp <warpname>', ['removewarp']);
-    $this->setPrefix('warp.prefix');
-    $this->setPermission("delwarp");
-  }
-
-  public function run(CommandSender $sender, string $prefix, PELang $lang, array $args): void
-  {
-
-    if (!($sender instanceof Player)) {
-      $sender->sendMessage($prefix . $lang->translateString('error.console'));
-      return;
+    public function __construct() {
+        parent::__construct('delwarp', 'delete warp from server', '/delwarp <warpname>', ['removewarp']);
+        $this->setPrefix('warp.prefix');
+        $this->setPermission("delwarp");
     }
 
-    if (!isset($args[0])) {
-      $sender->sendMessage($prefix . $this->getUsage());
-      return;
-    }
+    public function run(CommandSender $sender, string $prefix, PELang $lang, array $args): void {
 
-    $mgr = PowerEssentials::getInstance()->getDataManager();
-    if (!$mgr->warpExists($args[0])) {
-      $sender->sendMessage($prefix . $lang->translateString('error.null'));
-      return;
-    }
+        if (!($sender instanceof Player)) {
+            $sender->sendMessage($prefix . $lang->translateString('error.console'));
+            return;
+        }
 
-    $mgr->removeWarp($args[0]);
-    $sender->sendMessage($prefix . $lang->translateString('warp.del', [$args[0]]));
-  }
+        if (!isset($args[0])) {
+            $sender->sendMessage($prefix . $this->getUsage());
+            return;
+        }
+
+        $mgr = PowerEssentials::getInstance()->getDataManager();
+        if (!$mgr->warpExists($args[0])) {
+            $sender->sendMessage($prefix . $lang->translateString('error.null'));
+            return;
+        }
+
+        $mgr->removeWarp($args[0]);
+        $sender->sendMessage($prefix . $lang->translateString('warp.del', [$args[0]]));
+    }
 }

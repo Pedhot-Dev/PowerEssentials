@@ -30,125 +30,111 @@ use angga7togk\poweressentials\manager\UserManager;
 use pocketmine\player\Player;
 use pocketmine\plugin\PluginBase;
 
-class PowerEssentials extends PluginBase
-{
-	private static PowerEssentials $instance;
-	private DataManager $dataManager;
+class PowerEssentials extends PluginBase {
+    private static PowerEssentials $instance;
+    private DataManager $dataManager;
 
-	/** @var UserManager[] */
-	private array $userManagers = [];
+    /** @var UserManager[] */
+    private array $userManagers = [];
 
-	private PELang $lang;
+    private PELang $lang;
 
+    public static function getInstance(): self {
+        return self::$instance;
+    }
 
-	protected function onLoad(): void
-	{
-		self::$instance = $this;
-	}
+    public function onEnable(): void {
+        $this->loadResources();
+        $this->dataManager = new DataManager($this);
+        $this->loadCommands();
+        $this->loadListeners();
+    }
 
-	public function onEnable(): void
-	{
-		$this->loadResources();
-		$this->dataManager = new DataManager($this);
-		$this->loadCommands();
-		$this->loadListeners();
-	}
+    private function loadResources(): void {
+        /** place this on first */
+        PEConfig::init();
 
-	public function registerUserManager(Player $player): void
-	{
-		$this->userManagers[$player->getName()] = new UserManager($player);
-	}
+        $oldLanguageDir = $this->getDataFolder() . "language";
+        if (file_exists($oldLanguageDir)) {
+            $this->unlinkRecursive($oldLanguageDir);
+        }
 
-	public function unregisterUserManager(Player $player): void
-	{
-		unset($this->userManagers[$player->getName()]);
-	}
+        $resources = $this->getResources();
+        foreach ($resources as $resource) {
+            $fileName = $resource->getFileName();
+            $extension = $this->getFileExtension($fileName);
 
-	public function getUserManager(Player $player): UserManager
-	{
-		return $this->userManagers[$player->getName()] ?? $this->userManagers[$player->getName()] = new UserManager($player);
-	}
+            if ($extension !== PELang::LANGUAGE_EXTENSION) continue;
 
-	public function getDataManager(): DataManager
-	{
-		return $this->dataManager;
-	}
+            $lang = new PELang($resource);
+            $this->getLogger()->debug("Loaded language file: {$lang->getLang()}.ini");
+        }
+        PELang::setConsoleLocale(PEConfig::getLang());
+        $this->lang = PELang::fromConsole();
+        $message = $this->lang->translateString("language.selected", [
+            $this->lang->getName(),
+            $this->lang->getLang(),
+        ]);
+        $this->getLogger()->info($message);
+    }
 
-	private function loadResources(): void
-	{
-		/** place this on first */
-		PEConfig::init();
+    private function unlinkRecursive(string $dir): bool {
+        $files = array_diff(scandir($dir), [".", ".."]);
+        foreach ($files as $file) {
+            $path = $dir . DIRECTORY_SEPARATOR . $file;
+            is_dir($path) ? $this->unlinkRecursive($path) : unlink($path);
+        }
+        return rmdir($dir);
+    }
 
-		$oldLanguageDir = $this->getDataFolder() . "language";
-		if (file_exists($oldLanguageDir)) {
-			$this->unlinkRecursive($oldLanguageDir);
-		}
+    private function getFileExtension(string $path): string {
+        $exploded = explode(".", $path);
+        return $exploded[array_key_last($exploded)];
+    }
 
-		$resources = $this->getResources();
-		foreach ($resources as $resource) {
-			$fileName = $resource->getFileName();
-			$extension = $this->getFileExtension($fileName);
+    private function loadCommands(): void {
+        $commands = [
+            'lobby' => [new LobbyCommand(), new SetLobbyCommand()],
+            'fly' => [new FlyCommand()],
+            'gamemode' => [new AdvantureCommand(), new CreativeCommand(), new SpectatorCommand(), new SurvivalCommand()],
+            'nickname' => [new NicknameCommand()],
+            'home' => [new HomeCommand(), new DelHomeCommand, new SetHomeCommand()],
+            'coordinates' => [new CoordinatesCommand()],
+            'warp' => [new WarpCommand(), new AddWarpCommand(), new DelWarpCommand()],
+            'heal' => [new HealCommand()],
+            'feed' => [new FeedCommand()],
+            'sudo' => [new SudoCommand()],
+            'banitem' => [new BanItemCommand(), new UnbanItemCommand(), new BanItemListCommand()]
+        ];
 
-			if ($extension !== PELang::LANGUAGE_EXTENSION) continue;
+        foreach ($commands as $keyCmd => $valueCmd) {
+            if (!PEConfig::isCommandDisabled($keyCmd)) {
+                $this->getServer()->getCommandMap()->registerAll($this->getName(), $valueCmd);
+            }
+        }
+    }
 
-			$lang = new PELang($resource);
-			$this->getLogger()->debug("Loaded language file: {$lang->getLang()}.ini");
-		}
-		PELang::setConsoleLocale(PEConfig::getLang());
-		$this->lang = PELang::fromConsole();
-		$message = $this->lang->translateString("language.selected", [
-			$this->lang->getName(),
-			$this->lang->getLang(),
-		]);
-		$this->getLogger()->info($message);
-	}
+    private function loadListeners(): void {
+        $this->getServer()->getPluginManager()->registerEvents(new EventListener($this), $this);
+    }
 
-	private function unlinkRecursive(string $dir): bool
-	{
-		$files = array_diff(scandir($dir), [".", ".."]);
-		foreach ($files as $file) {
-			$path = $dir . DIRECTORY_SEPARATOR . $file;
-			is_dir($path) ? $this->unlinkRecursive($path) : unlink($path);
-		}
-		return rmdir($dir);
-	}
+    public function registerUserManager(Player $player): void {
+        $this->userManagers[$player->getName()] = new UserManager($player);
+    }
 
-	private function getFileExtension(string $path): string
-	{
-		$exploded = explode(".", $path);
-		return $exploded[array_key_last($exploded)];
-	}
+    public function unregisterUserManager(Player $player): void {
+        unset($this->userManagers[$player->getName()]);
+    }
 
-	private function loadListeners(): void
-	{
-		$this->getServer()->getPluginManager()->registerEvents(new EventListener($this), $this);
-	}
+    public function getUserManager(Player $player): UserManager {
+        return $this->userManagers[$player->getName()] ?? $this->userManagers[$player->getName()] = new UserManager($player);
+    }
 
-	private function loadCommands(): void
-	{
-		$commands = [
-			'lobby' => [new LobbyCommand(), new SetLobbyCommand()],
-			'fly' => [new FlyCommand()],
-			'gamemode' => [new AdvantureCommand(), new CreativeCommand(), new SpectatorCommand(), new SurvivalCommand()],
-			'nickname' => [new NicknameCommand()],
-			'home' => [new HomeCommand(), new DelHomeCommand, new SetHomeCommand()],
-			'coordinates' => [new CoordinatesCommand()],
-			'warp' => [new WarpCommand(), new AddWarpCommand(), new DelWarpCommand()],
-			'heal' => [new HealCommand()],
-			'feed' => [new FeedCommand()],
-			'sudo' => [new SudoCommand()],
-			'banitem' => [new BanItemCommand(), new UnbanItemCommand(), new BanItemListCommand()]
-		];
+    public function getDataManager(): DataManager {
+        return $this->dataManager;
+    }
 
-		foreach ($commands as $keyCmd => $valueCmd) {
-			if (!PEConfig::isCommandDisabled($keyCmd)) {
-				$this->getServer()->getCommandMap()->registerAll($this->getName(), $valueCmd);
-			}
-		}
-	}
-
-	public static function getInstance(): self
-	{
-		return self::$instance;
-	}
+    protected function onLoad(): void {
+        self::$instance = $this;
+    }
 }
